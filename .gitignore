@@ -5,7 +5,7 @@
 #   git config --global core.excludesfile ~/.gitignore_global
 
 # dev chain dir
-./dev-chain
+dev-chain/
 
 */**/*un~
 */**/*.test
