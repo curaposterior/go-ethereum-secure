@@ -4,6 +4,10 @@ import tempfile
 from dataclasses import dataclass
 import json
 
+
+GETH_CONNECTION_STRING = "http://127.0.0.1:8545"
+
+
 @dataclass
 class TestAccount:
     name: str
@@ -102,9 +106,31 @@ def create_test_account(name: str) -> TestAccount:
     return TestAccount(name=name, priv_key=priv_key.lower(), pub_key=pub_key.lower(), balance='0')
 
 
-def send_transaction():
-    # check if there's an error that the transation is accepted or not,
-    pass
+def send_transaction(_from: TestAccount, _to: TestAccount, value: str) -> bool:
+    print(f"\n[TX] {_from.name} ({_from.pub_key}) -> {_to.name} ({_to.pub_key}) value={value}")
+    result = subprocess.run(
+        [
+            'cast', 'send',
+            _to.pub_key,
+            '--value', value,
+            '--rpc-url', GETH_CONNECTION_STRING,
+            '--private-key', _from.priv_key,
+            '--json',
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        try:
+            tx_hash = json.loads(result.stdout).get('transactionHash', '?')
+        except (json.JSONDecodeError, AttributeError):
+            tx_hash = '?'
+        print(f"[TX] accepted tx_hash={tx_hash}")
+        return True
+    else:
+        error = (result.stderr or result.stdout).strip()
+        print(f"[TX] rejected {error}")
+        return False
 
 
 def main(blacklist: Blacklist):
@@ -129,7 +155,22 @@ def main(blacklist: Blacklist):
     test_2.can_send = False
     test_2._present_account()
 
+    print("="*40)
+    print("TESTING TRANSATIONS")
+    print("="*40)
+
+    print(f"Blacklisting: {starting_account.pub_key} and {test_2.pub_key}")
+    blacklist._blacklist_recipient(starting_account.pub_key)
     blacklist._blacklist_sender(test_2.pub_key)
+    input()
+    send_transaction(starting_account, test_1, "0.2ether")
+    input()
+    send_transaction(starting_account, test_2, "2ether")
+    input()
+    send_transaction(test_1, starting_account, "1wei")
+    input()
+    send_transaction(test_2, test_1, "2wei")
+    input()
 
 
 if __name__ == "__main__":
